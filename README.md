@@ -28,4 +28,4 @@ YTParty is a basic Node.JS program which can be hosted for free on your laptop o
 
 ## Changing the video
 
-Currently, all your clients will need to leave and rejoin to allow you to change the video. Once they have all left, you can enter a new video link as stated above.
+use `/setvideo [new video link]` to set a new video

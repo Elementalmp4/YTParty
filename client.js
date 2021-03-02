@@ -174,6 +174,8 @@ webSocketClient.onmessage = function(content) {
         addChatMessage(serverPacket);
     } else if (serverPacket.command == "servermsg") {
         addSystemMessage(serverPacket.body);
+    } else if (serverPacket.command == "autoload") {
+        location.reload();
     }
 }
 
@@ -192,6 +194,61 @@ function setName(name) {
     setServerUsername(name);
 }
 
+function setNewVideo(videoURL) {
+    payload = JSON.stringify({
+        "command": "newVideo",
+        "body": videoURL
+    });
+    webSocketClient.send(payload);
+}
+
+const fonts = {
+    "italic": ["𝘢", "𝘣", "𝘤", "𝘥", "𝘦", "𝘧", "𝘨", "𝘩", "𝘪", "𝘫", "𝘬", "𝘭", "𝘮", "𝘯", "𝘰", "𝘱", "𝘲", "𝘳", "𝘴", "𝘵", "𝘶", "𝘷", "𝘸", "𝘹", "𝘺", "𝘻", "𝘈", "𝘉", "𝘊", "𝘋", "𝘌", "𝘍", "𝘎", "𝘏", "𝘐", "𝘑", "𝘒", "𝘓", "𝘔", "𝘕", "𝘖", "𝘗", "𝘘", "𝘙", "𝘚", "𝘛", "𝘜", "𝘝", "𝘞", "𝘟", "𝘠", "𝘡"],
+    "bold": ["𝗮", "𝗯", "𝗰", "𝗱", "𝗲", "𝗳", "𝗴", "𝗵", "𝗶", "𝗷", "𝗸", "𝗹", "𝗺", "𝗻", "𝗼", "𝗽", "𝗾", "𝗿", "𝘀", "𝘁", "𝘂", "𝘃", "𝘄", "𝘅", "𝘆", "𝘇", "𝗔", "𝗕", "𝗖", "𝗗", "𝗘", "𝗙", "𝗚", "𝗛", "𝗜", "𝗝", "𝗞", "𝗟", "𝗠", "𝗡", "𝗢", "𝗣", "𝗤", "𝗥", "𝗦", "𝗧", "𝗨", "𝗩", "𝗪", "𝗫", "𝗬", "𝗭"],
+    "cursive": ["𝒶", "𝒷", "𝒸", "𝒹", "𝑒", "𝒻", "𝑔", "𝒽", "𝒾", "𝒿", "𝓀", "𝓁", "𝓂", "𝓃", "𝑜", "𝓅", "𝓆", "𝓇", "𝓈", "𝓉", "𝓊", "𝓋", "𝓌", "𝓍", "𝓎", "𝓏", "𝒜", "𝐵", "𝒞", "𝒟", "𝐸", "𝐹", "𝒢", "𝐻", "𝐼", "𝒥", "𝒦", "𝐿", "𝑀", "𝒩", "𝒪", "𝒫", "𝒬", "𝑅", "𝒮", "𝒯", "𝒰", "𝒱", "𝒲", "𝒳", "𝒴", "𝒵"],
+    "strikethrough": ["a̵", "b̵", "c̵", "d̵", "e̵", "f̵", "g̵", "h̵", "i̵", "j̵", "k̵", "l̵", "m̵", "n̵", "o̵", "p̵", "q̵", "r̵", "s̵", "t̵", "u̵", "v̵", "w̵", "x̵", "y̵", "z̵", "A̵", "B̵", "C̵", "D̵", "E̵", "F̵", "G̵", "H̵", "I̵", "J̵", "K̵", "L̵", "M̵", "N̵", "O̵", "P̵", "Q̵", "R̵", "S̵", "T̵", "U̵", "V̵", "W̵", "X̵", "Y̵", "Z̵"],
+    "underline": ["a̲̲", "b̲̲", "c̲̲", "d̲̲", "e̲̲", "f̲̲", "g̲̲", "h̲̲", "i̲̲", "j̲̲", "k̲̲", "l̲̲", "m̲̲", "n̲̲", "o̲̲", "p̲̲", "q̲̲", "r̲̲", "s̲̲", "t̲̲", "u̲̲", "v̲̲", "w̲̲", "x̲̲", "y̲̲", "z̲̲", "a̲", "b̲", "c̲", "d̲", "e̲", "f̲", "g̲", "h̲", "i̲", "j̲", "k̲", "l̲", "m̲", "n̲", "o̲", "p̲", "q̲", "r̲", "s̲", "t̲", "u̲", "v̲", "w̲", "x̲", "y̲", "z̲"],
+    "english": ["a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p", "q", "r", "s", "t", "u", "v", "w", "x", "y", "z", "A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P", "Q", "R", "S", "T", "U", "V", "W", "X", "Y", "Z"]
+};
+
+function convert(body, fontName) {
+    font = fonts[fontName];
+    var message = "";
+    str = body.split("");
+    for (i = 0; i < str.length; i++) {
+        if (fonts.english.includes(str[i])) {
+            message = message + font[fonts.english.indexOf(str[i])];
+        } else {
+            message = message + str[i];
+        }
+    }
+    return message;
+}
+
+function toCrazyCase(body) {
+    var direction = Math.round(Math.random());
+    var chars = body.split("");
+    var final = "";
+    for (var i = 0; i < chars.length; i++) {
+        if (fonts.english.includes(chars[i])) {
+            if (direction == 0) {
+                final += chars[i].toLowerCase();
+                direction = 1;
+            } else {
+                final += chars[i].toUpperCase();
+                direction = 0;
+            }
+        } else {
+            final += chars[i];
+        }
+    }
+    return final;
+}
+
+function toSpacedMessage(message) {
+    return message.split("").join(" ");
+}
+
 document.getElementById("chat-input").addEventListener("keyup", function(event) {
     if (event.keyCode === 13) {
         event.preventDefault();
@@ -202,15 +259,36 @@ document.getElementById("chat-input").addEventListener("keyup", function(event) 
         }
 
         if (message.startsWith("/")) {
-            const args = message.split(/ +/g);
-            const command = args.shift();
+            var sendChatMessage = true;
+            const args = message.slice(1).split(/ +/);
+            const command = args.shift().toLowerCase();
             document.getElementById("chat-input").value = "";
 
-            if (command == "/setname") {
+            if (command == "setname") {
                 setName(args.join(" "));
                 sendChatMessage = false;
-            } else if (command == "/ping") {
+            } else if (command == "ping") {
                 addSystemMessage("Pong!");
+                sendChatMessage = false;
+            } else if (command == "setvideo") {
+                setNewVideo(args[0]);
+            } else if (command == "help") {
+                addSystemMessage("/setname - sets your name /setvideo - sets the new video /help - shows this message /b - changes your text to bold /i - changes your text to italics /c - changes your text to cursive /cc - cHaNgEs YoUr TeXt LiKe ThIs /s - strikes through your message /u - underlines your message /sp - seperates every character in your message with a space")
+                sendChatMessage = false;
+            } else if (command == "b") {
+                message = convert(args.join(" "), "bold")
+            } else if (command == "i") {
+                message = convert(args.join(" "), "italic")
+            } else if (command == "c") {
+                message = convert(args.join(" "), "cursive")
+            } else if (command == "s") {
+                message = convert(args.join(" "), "strikethrough")
+            } else if (command == "u") {
+                message = convert(args.join(" "), "underline")
+            } else if (command == "cc") {
+                message = toCrazyCase(args.join(" "));
+            } else if (command == "sp") {
+                message = toSpacedMessage(args.join(" "));
             }
 
             document.getElementById("chat-input").value = "";

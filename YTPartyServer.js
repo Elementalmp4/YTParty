@@ -28,7 +28,7 @@ var HostServer = http.createServer(function(req, res) {
     } else if (q.pathname == '/client.js') {
         console.log(Color.GREEN + "Delivered client script");
         fs.readFile('./client.js', function(err, data) {
-            res.writeHead(200, { 'Content-Type': 'text/javascript' });
+            res.writeHead(200, { 'Content-Type': 'text/javascript; charset=utf-8' });
             res.write(data);
             return res.end();
         });
@@ -92,8 +92,26 @@ function sendChatMessage(packet) {
     wsServer.broadcast(JSON.stringify(packet));
 };
 
+function loadNewVideo(URL) {
+    var q = url.parse(URL, true);
+    var viewkey = q.query.v;
+    if (!viewkey) {
+        return;
+    }
+
+    playerViewKey = viewkey;
+    autoLoading = true;
+
+    payload = {
+        "command": "autoload"
+    }
+
+    wsServer.broadcast(JSON.stringify(payload));
+}
+
 var playerViewKey = "";
 var clients = 0;
+var autoLoading = false;
 
 wsServer = new WebSocketServer({
     httpServer: HostServer
@@ -119,6 +137,8 @@ wsServer.on('request', function(request) {
             setKey(packet.body);
         } else if (packet.command == "chat") {
             sendChatMessage(packet);
+        } else if (packet.command == "newVideo") {
+            loadNewVideo(packet.body);
         }
     });
 
@@ -128,7 +148,11 @@ wsServer.on('request', function(request) {
         clients = clients - 1;
         if (clients < 1) {
             clients = 0;
-            playerViewKey = "";
+            if (!autoLoading) {
+                playerViewKey = "";
+            } else {
+                autoLoading = false;
+            }
         }
     });
 });

@@ -3,6 +3,8 @@ const fs = require("fs");
 const WebSocketServer = require('websocket').server;
 const url = require("url");
 
+var chatlog = [];
+
 const HTTP_PORT = 8000;
 
 const Color = {
@@ -33,6 +35,14 @@ var HostServer = http.createServer(function(req, res) {
             return res.end();
         });
 
+    } else if (q.pathname == '/style.css') {
+        console.log(Color.GREEN + "Delivered CSS file");
+        fs.readFile('./style.css', function(err, data) {
+            res.writeHead(200, { 'Content-Type': 'text/css' });
+            res.write(data);
+            return res.end();
+        });
+
     } else {
         console.log(Color.RED + "Could not deliver '" + q.pathname + "'");
         res.writeHead(400, { 'Content-Type': 'text/html' });
@@ -53,6 +63,8 @@ function sendServerMessage(message) {
         "command": "servermsg",
         "body": message
     }
+    messageLog = { "user": "Gerald", "body": message, "sysMessage": true };
+    chatlog.push(messageLog);
     wsServer.broadcast(JSON.stringify(payload));
 }
 
@@ -62,7 +74,7 @@ function sendPlayingPacket(timestamp) {
         "body": timestamp
     };
     wsServer.broadcast(JSON.stringify(payload));
-    sendServerMessage("Video Playing");
+    sendServerMessage("Video Playing at " + new Date(timestamp * 1000).toISOString().substr(11, 8));
 };
 
 function sendPausedPacket() {
@@ -89,6 +101,8 @@ function setKey(key) {
 }
 
 function sendChatMessage(packet) {
+    messageLog = { "user": packet.user, "body": packet.body, "sysMessage": false };
+    chatlog.push(messageLog)
     wsServer.broadcast(JSON.stringify(packet));
 };
 
@@ -109,6 +123,24 @@ function loadNewVideo(URL) {
     wsServer.broadcast(JSON.stringify(payload));
 }
 
+function sendIdentity(connection, identity) {
+    payload = {
+        "command": "identify",
+        "body": identity
+    }
+    connection.send(JSON.stringify(payload));
+}
+
+function reloadChat(connection) {
+    chatlog.forEach(item => {
+        payload = {
+            "command": "chatload",
+            "body": item
+        }
+        connection.send(JSON.stringify(payload));
+    });
+}
+
 var playerViewKey = "";
 var clients = 0;
 var autoLoading = false;
@@ -122,6 +154,8 @@ wsServer.on('request', function(request) {
     clients++;
     console.log(Color.GREEN + "WebSocket client connected: " + request.key + " @ " + request.remoteAddress);
     sendServerMessage("Someone has joined the party!");
+    sendIdentity(connection, request.key);
+    reloadChat(connection);
 
     connection.on('message', function(message) {
         packet = JSON.parse(message.utf8Data);
@@ -139,6 +173,13 @@ wsServer.on('request', function(request) {
             sendChatMessage(packet);
         } else if (packet.command == "newVideo") {
             loadNewVideo(packet.body);
+        } else if (packet.command == "clear") {
+            chatlog = [];
+            sendServerMessage("The chat has been cleared. It will not load when you change videos.");
+        } else if (packet.command == "typingstart") {
+            wsServer.broadcast(JSON.stringify(packet));
+        } else if (packet.command == "typingstop") {
+            wsServer.broadcast(JSON.stringify(packet));
         }
     });
 
@@ -150,6 +191,7 @@ wsServer.on('request', function(request) {
             clients = 0;
             if (!autoLoading) {
                 playerViewKey = "";
+                chatlog = [];
             } else {
                 autoLoading = false;
             }

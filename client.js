@@ -1,4 +1,5 @@
 //YTParty Setup
+$("#typing-indicator").hide();
 const websocketServerURL = "ws://" + location.host;
 webSocketClient = new WebSocket(websocketServerURL);
 const locationURL = new URL(location.href);
@@ -6,7 +7,19 @@ const viewKey = locationURL.searchParams.get("viewkey");
 var lastCommand = "",
     lastMessage = "",
     username = "",
+    identity = "",
+    typingCount = 0,
+    typing = false,
     globalKey = "";
+
+function updateTyping() {
+    if (typingCount < 1) {
+        $("#typing-indicator").hide();
+        typingCount = 0;
+    } else {
+        $("#typing-indicator").show();
+    }
+}
 
 function createPlayer(Viewkey) {
     globalKey = Viewkey;
@@ -29,7 +42,7 @@ function onYouTubeIframeAPIReady() {
 }
 
 function onPlayerReady(event) {
-    console.log("Ready");
+    console.log("Player Ready");
 }
 
 function sendPlayingPacket(time) {
@@ -118,13 +131,24 @@ function addChatMessage(message) {
     $('#chat').scrollTop($('#chat')[0].scrollHeight);
 }
 
+function stopTyping() {
+    payload = {
+        "command": "typingstop",
+        "identity": identity
+    }
+    webSocketClient.send(JSON.stringify(payload));
+    typing = false;
+}
+
 function sendMessage(message) {
     payload = JSON.stringify({
         "command": "chat",
         "user": username == "" ? "YTParty User" : username,
-        "body": message
+        "body": message,
+        "sysMessage": false
     });
     webSocketClient.send(payload);
+    stopTyping();
 };
 
 function addSystemMessage(message) {
@@ -141,6 +165,19 @@ function addSystemMessage(message) {
 
 function focusChat() {
     $("#chat-input").focus();
+}
+
+function sendTyping() {
+    if (($("#chat-input").val() !== "") && !typing) {
+        console.log("Typing...");
+        typing = true;
+
+        payload = {
+            "command": "typingstart",
+            "identity": identity
+        }
+        webSocketClient.send(JSON.stringify(payload));
+    }
 }
 
 //Websocket Functions
@@ -176,6 +213,24 @@ webSocketClient.onmessage = function(content) {
         addSystemMessage(serverPacket.body);
     } else if (serverPacket.command == "autoload") {
         location.reload();
+    } else if (serverPacket.command == "identify") {
+        console.log("Client identified as " + serverPacket.body);
+        identity = serverPacket.body;
+    } else if (serverPacket.command == "chatload") {
+        console.log("Chatload Triggered", serverPacket.body);
+        addChatMessage(serverPacket.body);
+    } else if (serverPacket.command == "typingstart") {
+        if (serverPacket.identity == identity) {
+            return;
+        }
+        typingCount = typingCount + 1;
+        updateTyping();
+    } else if (serverPacket.command == "typingstop") {
+        if (serverPacket.identity == identity) {
+            return;
+        }
+        typingCount = typingCount - 1;
+        updateTyping();
     }
 }
 
@@ -273,7 +328,7 @@ document.getElementById("chat-input").addEventListener("keyup", function(event) 
             } else if (command == "setvideo") {
                 setNewVideo(args[0]);
             } else if (command == "help") {
-                addSystemMessage("/setname - sets your name /setvideo - sets the new video /help - shows this message /b - changes your text to bold /i - changes your text to italics /c - changes your text to cursive /cc - cHaNgEs YoUr TeXt LiKe ThIs /s - strikes through your message /u - underlines your message /sp - seperates every character in your message with a space")
+                addSystemMessage("/setname - sets your name /setvideo - sets the new video /help - shows this message /b - changes your text to bold /i - changes your text to italics /c - changes your text to cursive /cc - cHaNgEs YoUr TeXt LiKe ThIs /s - strikes through your message /u - underlines your message /sp - seperates every character in your message with a space /clear - clears the server message logs. Comes into effect when you reload the page")
                 sendChatMessage = false;
             } else if (command == "b") {
                 message = convert(args.join(" "), "bold")
@@ -289,6 +344,9 @@ document.getElementById("chat-input").addEventListener("keyup", function(event) 
                 message = toCrazyCase(args.join(" "));
             } else if (command == "sp") {
                 message = toSpacedMessage(args.join(" "));
+            } else if (command == "clear") {
+                webSocketClient.send(JSON.stringify({ "command": "clear" }));
+                sendChatMessage = false;
             }
 
             document.getElementById("chat-input").value = "";
@@ -299,5 +357,8 @@ document.getElementById("chat-input").addEventListener("keyup", function(event) 
             document.getElementById("chat-input").value = "";
             sendMessage(message);
         }
+    } else {
+        sendTyping();
+        console.log(typingCount);
     }
 });
